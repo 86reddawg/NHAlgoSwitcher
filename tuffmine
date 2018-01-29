@@ -143,13 +143,18 @@ def updateGPUs():
 		print("GPU"+str(gpu)+": "+algos[gpu][old_algo].nh_name)+" already most profitable, no change"
 	    else:
 		#check if algo delta is large enough to swap
-		profit_diff = round(((algos[gpu][best_algo[gpu]].ratio / algos[gpu][old_algo].ratio)*100-100),1)
-		if algos[gpu][best_algo[gpu]].ratio > (algos[gpu][old_algo].ratio * (100 + rate_thresh) / 100 ):
+		if algos[gpu][old_algo].ratio == 0:
 		    print("GPU"+str(gpu)+": Changing from "+algos[gpu][old_algo].nh_name+" to "+algos[gpu][best_algo[gpu]].nh_name)
 		    killminer(gpu)
 		    startminer(gpu, best_algo[gpu])
 		else:
-		    print("GPU"+str(gpu)+": "+algos[gpu][best_algo[gpu]].nh_name+" "+str(profit_diff)+"% more profitable than "+algos[gpu][old_algo].nh_name+" (switch at "+str(rate_thresh)+"%)" )
+		    profit_diff = round(((algos[gpu][best_algo[gpu]].ratio / algos[gpu][old_algo].ratio)*100-100),1)
+		    if algos[gpu][best_algo[gpu]].ratio > (algos[gpu][old_algo].ratio * (100 + rate_thresh) / 100 ):
+			print("GPU"+str(gpu)+": Changing from "+algos[gpu][old_algo].nh_name+" to "+algos[gpu][best_algo[gpu]].nh_name)
+			killminer(gpu)
+			startminer(gpu, best_algo[gpu])
+		    else:
+			print("GPU"+str(gpu)+": "+algos[gpu][best_algo[gpu]].nh_name+" "+str(profit_diff)+"% more profitable than "+algos[gpu][old_algo].nh_name+" (switch at "+str(rate_thresh)+"%)" )
 	else:
 	    #No miner found, start a new one
 	    print("GPU"+str(gpu)+": Miner not running")
