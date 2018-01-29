@@ -9,7 +9,7 @@ rate_thresh = 10; #This is the percent that any new algorithm must overcome befo
 updaterate=2 #update rate in minutes:
 cards=[0, 1] #GPU ID of cards to mine on (uses Cuda GPU ids)
 
-#map algo name to hashrate (MH/s) and miner name
+#map algo name to hashrate (MH/s), miner name, intensity (-1 is auto), and overclocking
 #Name : [hashrate, miner, intensity, core overclock, memory overclock]
 hashrates=[None]*100
 
@@ -79,6 +79,8 @@ hashrates[1]= {
 'skunk'		 :[52.2,	'ccminer-1',	-1,	100,	800]
 }
 
+
+#Note, you need to update tuffminer miner_cmd() command list with the miner names and add in the command structure
 
 minerprog = [
 #name, path, program

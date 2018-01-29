@@ -1,9 +1,10 @@
 #!/usr/bin/python
-#TODO - put hashrates, miner, OC settings in cfg file for each GPU? Default to GPU0?
-#TODO - sort/display rates per card instead of following GPU0
-#TODO - encompass x display
+#TODO - [put hashrates, miner, OC settings in cfg file for each GPU.-DONE] Default to GPU0?
+#TODO - encompass xinit display in this script
 #TODO - error handling (internal and external)
 #TODO - verify hashrate with api
+#TODO - add power limits to config file
+#TODO - move miner command list to config file
 
 
 
@@ -15,12 +16,12 @@ def miner_cmd(gpu, miner, algo, location, port, username, minerid, password, int
     if miner=="ccminer-tpruvot" or miner=="ccminer-klaust" or miner=="ccminer-alexis78":
 	if intensity<0: intensity=""
 	else: intensity="-i "+str(intensity)
-	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
     elif miner=="cgminer":
 	if intensity<0: intensity=""
 	else: intensity="-i "+str(intensity)
-	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
-    elif miner=="nheqminer": #nheqminer won't connect anymore, no updates
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+    elif miner=="nheqminer": #nheqminer won't connect anymore
 	cmd="-l "+algo+"."+location+".nicehash.com:"+port+" -u "+username+"."+minerid+" -p "+password
     elif miner=="EWBF":
 	if intensity<0: intensity=""
@@ -123,7 +124,6 @@ def isInt(mystring):
 	return False
 
 def miningpid(i):
-    #print("ps ax |grep '"+userid+"\|GPU"+str(i)+"' | grep -v 'grep\|SCREEN' |tail -n1 |awk '{print $1}'")
     return runcmd("ps ax |grep "+userid+" | grep GPU"+str(i)+" | grep -v 'grep\|SCREEN' |tail -n1 |awk '{print $1}'")
 
 def updateGPUs():
@@ -176,7 +176,6 @@ def killminer(gpu):
 
 def applyOC(gpu, coreclock, memclock):
     pass
-    #TODO - create db of algo specific clock settings, power level?
     #print("Applying OC")
     #clock=100
     #memory=500
@@ -186,12 +185,6 @@ def removeOC(gpu):
     pass
     #print("Removing OC")
     #runcmd("DISPLAY=:"+str(gpu)+" nvidia-settings -a [gpu:0]/GPUGraphicsClockOffset[3]=0 -a [gpu:0]/GPUMemoryTransferRateOffset[3]=0")
-
-
-
-
-#add error handling for no comms
-
 
 init()
 checkGPU()
