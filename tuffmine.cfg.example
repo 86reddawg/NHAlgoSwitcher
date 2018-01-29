@@ -1,0 +1,89 @@
+#!/usr/bin/python
+
+mining_enabled=True
+userid = ""; #mining address
+password = "x"
+btcurl = "https://coinbase.com/api/v1/prices/spot_rate";
+algourl="https://api.nicehash.com/api?method=simplemultialgo.info"
+rate_thresh = 10; #This is the percent that any new algorithm must overcome before switching
+updaterate=2 #update rate in minutes:
+cards=[0, 1] #GPU ID of cards to mine on (uses Cuda GPU ids)
+
+#map algo name to hashrate (MH/s) and miner name
+#Name : [hashrate, miner, intensity, core overclock, memory overclock]
+hashrates=[None]*100
+
+hashrates[0]= {
+'scrypt'	 :[1.05,	'ccminer-1',	-1,	100,	800],
+'sha256'	 :[1819,	'ccminer-1',	-1,	100,	800],
+'scryptnf'	 :[0,		'ccminer-1',	-1,	100,	800],
+'x11'		 :[30.5,	'ccminer-2',	-1,	100,	800],
+'x13'		 :[22.2,	'ccminer-2',	-1,	100,	800],
+'keccak'	 :[1412,	'ccminer-3',	-1,	100,	800],
+'x15'		 :[20.5,	'ccminer-2',	-1,	100,	800],
+'nist5'		 :[84.5,	'ccminer-1',	26,	100,	800],
+'neoscrypt'	 :[1.534,	'ccminer-3',	-1,	100,	800],
+'lyra2re'	 :[13.4,	'ccminer-2',	23,	100,	800],
+'whirlpoolx'	 :[0,		'ccminer-1',	-1,	100,	800],
+'qubit'		 :[19.1,	'ccminer-2',	-1,	100,	800],
+'quark'		 :[52.5,	'ccminer-2',	-1,	100,	800],
+'axiom'		 :[0,		'ccminer-1',	-1,	100,	800],
+'lyra2rev2'	 :[74,		'ccminer-2',	22,	100,	800],
+'scryptjanenf16' :[0,		'ccminer-1',	-1,	100,	800],
+'blake256r8'	 :[8230,	'ccminer-1',	-1,	100,	800],
+'blake256r14'	 :[0,		'ccminer-1',	-1,	100,	800],
+'blake256r8vnl'	 :[12200,	'ccminer-1',	-1,	100,	800],
+'hodl'		 :[0,		'ccminer-1',	-1,	100,	800],
+'daggerhashimoto':[0,		'ccminer-1',	-1,	100,	800],
+'decred'	 :[5260,	'ccminer-2',	-1,	100,	800],
+'cryptonight'	 :[0.000771,	'ccminer-1',	-1,	100,	800],
+'lbry'		 :[530,		'ccminer-2',	-1,	100,	800],
+'equihash'	 :[0.000770,	'ccminer-4',	64,	100,	800], #0.000485 on ccminer
+'pascal'	 :[0,		'ccminer-1',	-1,	100,	800],
+'x11gost'	 :[0,		'ccminer-1',	-1,	100,	800],
+'sia'		 :[3355,	'ccminer-2',	-1,	100,	800],
+'blake2s'	 :[7650,	'ccminer-1',	31,	100,	800],
+'skunk'		 :[53.7,	'ccminer-1',	-1,	100,	800]
+}
+
+hashrates[1]= {
+'scrypt'	 :[1.05,	'ccminer-1',	-1,	100,	800],
+'sha256'	 :[1780,	'ccminer-1',	-1,	100,	800],
+'scryptnf'	 :[0,		'ccminer-1',	-1,	100,	800],
+'x11'		 :[29.8,	'ccminer-2',	-1,	100,	800],
+'x13'		 :[22.1,	'ccminer-2',	-1,	100,	800],
+'keccak'	 :[1406,	'ccminer-3',	-1,	100,	800],
+'x15'		 :[20.5,	'ccminer-2',	-1,	100,	800],
+'nist5'		 :[87,		'ccminer-2',	-1,	100,	800],
+'neoscrypt'	 :[1.523,	'ccminer-3',	-1,	100,	800],
+'lyra2re'	 :[13.1,	'ccminer-1',	26,	100,	800],
+'whirlpoolx'	 :[0,		'ccminer-1',	-1,	100,	800],
+'qubit'		 :[48.9,	'ccminer-2',	23,	100,	800],
+'quark'		 :[52.7,	'ccminer-2',	-1,	100,	800],
+'axiom'		 :[0,		'ccminer-1',	-1,	100,	800],
+'lyra2rev2'	 :[73.5,	'ccminer-2',	22,	100,	800],
+'scryptjanenf16' :[0,		'ccminer-1',	-1,	100,	800],
+'blake256r8'	 :[8230,	'ccminer-1',	-1,	100,	800],
+'blake256r14'	 :[0,		'ccminer-1',	-1,	100,	800],
+'blake256r8vnl'	 :[12200,	'ccminer-1',	-1,	100,	800],
+'hodl'		 :[0,		'ccminer-1',	-1,	100,	800],
+'daggerhashimoto':[0,		'ccminer-1',	-1,	100,	800],
+'decred'	 :[5237,	'ccminer-2',	-1,	100,	800],
+'cryptonight'	 :[0.000760,	'ccminer-1',	-1,	100,	800],
+'lbry'		 :[519.8,	'ccminer-1',	30,	100,	800],
+'equihash'	 :[0.000770,	'ccmienr-4'	64,	100,	800],
+'pascal'	 :[0,		'ccminer-1',	-1,	100,	800],
+'x11gost'	 :[0,		'ccminer-1',	-1,	100,	800],
+'sia'		 :[3095,	'ccminer-3',	24,	100,	800],
+'blake2s'	 :[7630,	'ccminer-1',	31,	100,	800],
+'skunk'		 :[52.2,	'ccminer-1',	-1,	100,	800]
+}
+
+
+minerprog = [
+#name, path, program
+["ccminer-1",	"/path/to/miner/", "miner"],
+["ccminer-3",	"/path/to/miner/", "miner"],
+["ccminer-2",	"/path/to/miner/", "miner"],
+["ccminer-4",	"/path/to/miner/", "miner"]
+]
