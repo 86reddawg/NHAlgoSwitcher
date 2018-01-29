@@ -1,0 +1,204 @@
+#!/usr/bin/python
+#TODO - put hashrates, miner, OC settings in cfg file for each GPU? Default to GPU0?
+#TODO - sort/display rates per card instead of following GPU0
+#TODO - encompass x display
+#TODO - error handling (internal and external)
+#TODO - verify hashrate with api
+
+
+import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, signal, socket
+
+
+def miner_cmd(gpu, miner, algo, location, port, username, minerid, password, intensity):
+    cmd=""
+    if miner=="ccminer-tpruvot" or miner=="ccminer-klaust" or miner=="ccminer-alexis78":
+	if intensity<0: intensity=""
+	else: intensity="-i "+str(intensity)
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+    elif miner=="cgminer":
+	if intensity<0: intensity=""
+	else: intensity="-i "+str(intensity)
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+    elif miner=="nheqminer": #nheqminer won't connect anymore, no updates
+	cmd="-l "+algo+"."+location+".nicehash.com:"+port+" -u "+username+"."+minerid+" -p "+password
+    elif miner=="EWBF":
+	if intensity<0: intensity=""
+	else: intensity="--intensity "+str(intensity)
+	cmd = "--server "+algo+"."+location+".nicehash.com --port "+port+" --user "+username+"."+minerid+" --pass "+password+" --fee 0 --templimit 75 --pec --eexit 1 "+intensity+" --cuda_devices "+str(gpu)
+    return cmd
+
+algos = []
+miner = []
+best_algo = 0
+gpucount = 0
+rate = 0
+devnull=open(os.devnull, 'wb')
+rundir = os.path.dirname(os.path.realpath(sys.argv[0]))
+
+
+
+class Algo:
+    def __init__(self, number, name, paying, port, hashrate, miner, intensity, coreclock, memclock):
+	self.nh_name = name
+	self.nh_paying = paying
+	self.nh_number = number
+	self.nh_port = port
+	self.hashrate = hashrate
+	self.miner_name = miner
+	self.ratio = float(paying) * float(hashrate)
+	self.intensity = intensity
+	self.coreclock = coreclock
+	self.memclock = memclock
+
+class Miner:
+    def __init__(self, name, path, prog):
+	self.name = name
+	self.path = path
+	self.prog = prog
+
+def init():
+    global miner
+    execfile(rundir+"/tuffmine.cfg", globals())
+    for line in minerprog:
+        miner.append(Miner(line[0], line[1], line[2]))
+
+def updatealgos():
+    global algos, best_algo, rate, ts
+    #Check config for any setting updates
+    execfile(rundir+"/tuffmine.cfg", globals())
+    #Find USD/BTC rate
+    rate=json.load(urllib.urlopen(btcurl))["amount"]
+    ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print("***** "+ts+" USD/BTC: "+rate+" (Coinbase) *****")
+
+    data=json.load(urllib.urlopen(algourl))
+    data = data['result']['simplemultialgo']
+    for gpu in range(gpucount):
+	tempalgos = [None]*len(data)
+	for line in data:
+	    hashdata=hashlookup(gpu, line["name"])
+	    tempalgos[line["algo"]] = (Algo(line["algo"],line["name"],line["paying"],line["port"],hashdata[0],line["name"],hashdata[2],hashdata[3],hashdata[4]))
+
+	#Sort the algorithms in ascending profit
+	tempalgos=sorted(tempalgos, key=lambda tempalgos: tempalgos.ratio)
+
+	#Display profitability of each active algorithm
+	header="{:<16}".format("GPU"+str(gpu)+" Algo")+": "+"{:<8}".format("mBTC/day")+" : "+"{:<8}".format("USD/day")
+	print(header)
+        for algo in tempalgos:
+	    if algo.ratio > 0:
+    		algotxt="{:<16}".format(algo.nh_name)+": "+"{:<8}".format(str(algo.ratio)[:7])+" : "+str(format(algo.ratio*float(rate)/1000, '.2f'))
+		print(algotxt)
+	best_algo[gpu] = len(tempalgos)-1
+	algos[gpu]=tempalgos
+
+
+def checkGPU():
+    global gpucount, algos, best_algo
+    #Find number of NVIDIA GPUs:
+    gpucountcmd = "nvidia-smi --query-gpu=count --format=csv,noheader | tail -n 1"
+    gpucount = int(runcmd(gpucountcmd))
+    if gpucount < 1:
+	print("No NVIDIA cards found")
+	sys.exit(1)
+    print("NVIDIA cards found: "+str(gpucount))
+    algos = [None]*gpucount
+    best_algo = [0]*gpucount
+
+def hashlookup(gpu, hashname):
+    if hashrates[gpu].has_key(hashname): return hashrates[gpu][hashname]
+    else: return 0
+
+def runcmd(stringcmd):
+    #cmdrun = subprocess.Popen(shlex.split(stringcmd), stdout=subprocess.PIPE, stderr=devnull)
+    cmdrun = subprocess.Popen(stringcmd, stdout=subprocess.PIPE, stderr=devnull, shell=True)
+    return cmdrun.stdout.read()
+
+def isInt(mystring):
+    try:
+	int(mystring)
+	return True
+    except ValueError:
+	return False
+
+def miningpid(i):
+    #print("ps ax |grep '"+userid+"\|GPU"+str(i)+"' | grep -v 'grep\|SCREEN' |tail -n1 |awk '{print $1}'")
+    return runcmd("ps ax |grep "+userid+" | grep GPU"+str(i)+" | grep -v 'grep\|SCREEN' |tail -n1 |awk '{print $1}'")
+
+def updateGPUs():
+    for gpu in range(gpucount):
+	print("")
+	minerpid=miningpid(gpu)
+	if isInt(minerpid):
+	    #Existing miner found.  If using the best algo, do nothing.  Else kill miner and start new
+	    minercmd=runcmd("ps -o command= "+str(minerpid))
+	    old_algo = 0
+    	    for idx, algo in enumerate(algos[gpu]):
+		if (algo.nh_name in minercmd) and (str(algo.nh_port) in minercmd):
+		    old_algo = idx
+		    break
+
+	    if old_algo==best_algo[gpu]:
+		print("Miner already running most profitable algo on GPU"+str(gpu)+": "+algos[gpu][old_algo].nh_name)
+	    else:
+		#check if algo delta is large enough to swap
+		profit_diff = round(((algos[gpu][best_algo[gpu]].ratio / algos[gpu][old_algo].ratio)*100-100),1)
+		if algos[gpu][best_algo[gpu]].ratio > (algos[gpu][old_algo].ratio * (100 + rate_thresh) / 100 ):
+		    print("Changing from "+algos[gpu][old_algo].nh_name+" to "+algos[gpu][best_algo[gpu]].nh_name+" on GPU"+str(gpu))
+		    killminer(gpu)
+		    startminer(gpu, best_algo[gpu])
+		else:
+		    print("Profitablility difference for GPU"+str(gpu)+" ("+str(profit_diff)+"%) less than setting ("+str(rate_thresh)+"%)" )
+
+	else:
+	    #No miner found, start a new one
+	    print("Miner not running on GPU"+str(gpu))
+	    startminer(gpu, best_algo[gpu])
+
+
+def startminer(gpu, algo):
+    #apply overclock
+    applyOC(gpu, algos[gpu][algo].coreclock, algos[gpu][algo].memclock)
+    location="usa"
+    msel = [x for x in miner if x.name==hashrates[gpu][algos[gpu][algo].nh_name][1]][0]
+    options = miner_cmd(gpu, msel.name, algos[gpu][algo].nh_name, location, str(algos[gpu][algo].nh_port), userid, socket.gethostname()+"GPU"+str(gpu), password, algos[gpu][algo].intensity)
+    cmd="screen -dmS GPU"+str(gpu)+" "+msel.path+msel.prog+" "+options
+    print(cmd)
+    runcmd(cmd)
+
+def killminer(gpu):
+    #remove overclock
+    removeOC(gpu)
+    print("Killing miner for GPU"+str(gpu)+", pid: "+miningpid(gpu))
+    while isInt(miningpid(gpu)):
+	os.kill(int(miningpid(gpu)), signal.SIGKILL)
+	time.sleep(.5)
+
+def applyOC(gpu, coreclock, memclock):
+    pass
+    #TODO - create db of algo specific clock settings, power level?
+    #print("Applying OC")
+    #clock=100
+    #memory=500
+    #runcmd("DISPLAY=:"+str(gpu)+" nvidia-settings -a [gpu:0]/GPUGraphicsClockOffset[3]="+str(clock)+" -a [gpu:0]/GPUMemoryTransferRateOffset[3]="+str(memory)+"")
+
+def removeOC(gpu):
+    pass
+    #print("Removing OC")
+    #runcmd("DISPLAY=:"+str(gpu)+" nvidia-settings -a [gpu:0]/GPUGraphicsClockOffset[3]=0 -a [gpu:0]/GPUMemoryTransferRateOffset[3]=0")
+
+
+
+
+#add error handling for no comms
+
+
+init()
+checkGPU()
+while True:
+    updatealgos()
+    updateGPUs()
+    sys.exit(0)
+    time.sleep(60*updaterate)
+
+
