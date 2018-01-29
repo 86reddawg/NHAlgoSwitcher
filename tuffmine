@@ -149,7 +149,7 @@ def updateGPUs():
 		    startminer(gpu, best_algo[gpu])
 		else:
 		    print("Profitablility difference for GPU"+str(gpu)+" ("+str(profit_diff)+"%) less than setting ("+str(rate_thresh)+"%)" )
-
+		    print("GPU"+str(gpu)+": "+algos[gpu][best_algo[gpu]].nh_name+" "+str(profit_diff)+"% more profitable than "+algos[gpu][old_algo].nh_name+" (switch at "+str(rate_thresh)+"%)" )
 	else:
 	    #No miner found, start a new one
 	    print("Miner not running on GPU"+str(gpu))
