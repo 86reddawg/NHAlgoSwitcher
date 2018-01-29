@@ -6,6 +6,7 @@
 #TODO - verify hashrate with api
 
 
+
 import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, signal, socket
 
 
