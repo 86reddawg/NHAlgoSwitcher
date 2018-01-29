@@ -8,6 +8,7 @@ sleep 5
 #Initialize fan control
 DISPLAY=:0 /usr/bin/nvidia-settings -a [gpu:0]/GPUFanControlState=1 -a [fan:0]/GPUTargetFanSpeed=50
 DISPLAY=:1 /usr/bin/nvidia-settings -a [gpu:0]/GPUFanControlState=1 -a [fan:0]/GPUTargetFanSpeed=50
+#note, each GPU is considered "gpu:0" in its respective xinit display
 
 #Start auto fan control
 screen -dmS FAN /path/to/fan/script
@@ -16,8 +17,8 @@ screen -dmS FAN /path/to/fan/script
 DISPLAY=:0 /usr/bin/nvidia-settings -a [gpu:0]/GPUPowerMizerMode=1
 DISPLAY=:1 /usr/bin/nvidia-settings -a [gpu:0]/GPUPowerMizerMode=1
 
-#give me enough time to ssh and fix issues if OC is too high
+#give me enough time to ssh and fix issues if OC is too high on boot
 sleep 30
-DISPLAY=:0 /usr/bin/nvidia-settings -a GPUGraphicsClockOffset[3]=100 -a GPUMemoryTransferRateOffset[3]=800
-DISPLAY=:1 /usr/bin/nvidia-settings -a GPUGraphicsClockOffset[3]=100 -a GPUMemoryTransferRateOffset[3]=800
+DISPLAY=:0 /usr/bin/nvidia-settings -a [gpu:0]/GPUGraphicsClockOffset[3]=100 -a [gpu:0]/GPUMemoryTransferRateOffset[3]=800
+DISPLAY=:1 /usr/bin/nvidia-settings -a [gpu:0]/GPUGraphicsClockOffset[3]=100 -a [gpu:0]/GPUMemoryTransferRateOffset[3]=800
 #Note, overclocking is being moved to the tuffmine script at a future release
