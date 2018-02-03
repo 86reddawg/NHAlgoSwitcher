@@ -5,7 +5,10 @@
 #TODO - verify hashrate with api
 #TODO - add power limits to config file
 #TODO - move miner command list to config file
-
+#TODO - implement OC commands
+#TODO - tie gpu uuid to hashrates
+#TODO - create xorg scripts tied to pci address
+#TODO - root access for persistence mode and creating xorg scripts?
 
 
 import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, signal, socket, re
@@ -98,25 +101,69 @@ def updatealgos():
 def checkGPU():
     global gpucount, algos, best_algo
 
-    gpus_info=runcmd("nvidia-smi -L")
-    matches = re.findall(
-	r"GPU (?P<gpunum>\d*):.*GPU-(?P<uuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})",
-	gpus_info
-    )
-    cards = None if not matches else {gpunum: "GPU-"+uuid for gpunum, uuid in matches}
 
-    if cards is None:
+    gpu_list=runcmd("nvidia-smi --query-gpu=index,pci.bus_id,uuid,name --format=csv,noheader")
+    matches = re.findall(
+	r"(?P<idx>\d*), (?P<pci>.*), (?P<uuid>.*), (?P<name>.*)",
+	gpu_list
+    )
+    gpucount=len(matches)
+#    print("Found "+str(gpucount)+" cards")
+    if gpucount==0:
 	print("No NVIDIA cards found, exiting")
 	sys.exit(1)
-
     else:
-	gpucount=len(cards)
-	for card in range(gpucount):
-	    print("GPU "+str(card)+": "+cards[str(card)])
 	print("NVIDIA cards found: "+str(gpucount))
+	for card in matches:
+    	    #print(gpu_list)
+            gpu_idx=int(card[0])
+            pci=card[1]
+            uuid=card[2]
+            name=card[3]
+		#pci=runcmd("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader -i "+str(card))
+            domain=int(pci.split(":")[0],16)
+            bus=int(pci.split(":")[1],16)
+            device=int(pci.split(":")[2].split(".")[0],16)
+            function=int(pci.split(":")[2].split(".")[0],16)
+            address=str(bus)+"@"+str(domain)+":"+str(device)+":"+str(function)
+            #bus@domain:device:function
+            print("GPU "+str(gpu_idx)+": "+address+" and uuid="+uuid+" ("+name+")")
 	algos = [None]*gpucount
 	best_algo = [0]*gpucount
 
+
+#    gpus_info=runcmd("nvidia-smi -L")
+#    matches = re.findall(
+#	r"GPU (?P<gpunum>\d*):.*GPU-(?P<uuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})",
+#	gpus_info
+#    )
+#    cards = None if not matches else {gpunum: "GPU-"+uuid for gpunum, uuid in matches}
+
+#    if cards is None:
+#	print("No NVIDIA cards found, exiting")
+#	sys.exit(1)
+
+#    else:
+#	gpucount=len(cards)
+#	for card in range(gpucount):
+#	    pci=runcmd("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader -i "+str(card))
+#	    domain=int(pci.split(":")[0],16)
+#	    bus=int(pci.split(":")[1],16)
+#	    device=int(pci.split(":")[2].split(".")[0],16)
+#	    function=int(pci.split(":")[2].split(".")[0],16)
+#	    address=str(bus)+"@"+str(domain)+":"+str(device)+":"+str(function)
+#	    #bus@domain:device:function
+#	    print("GPU "+str(card)+": "+cards[str(card)]+" at PCI address: "+address)
+#	    pass
+#	    #print("GPU "+str(card)+": "+cards[str(card)])
+#	print("NVIDIA cards found: "+str(gpucount))
+#	algos = [None]*gpucount
+#	best_algo = [0]*gpucount
+
+
+#    numberofcards=len(cards)
+#    for card in range(len(cards)):
+#	pass
 
 
     #Find number of NVIDIA GPUs:
