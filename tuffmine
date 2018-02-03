@@ -8,7 +8,7 @@
 
 
 
-import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, signal, socket
+import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, signal, socket, re
 
 
 def miner_cmd(gpu, miner, algo, location, port, username, minerid, password, intensity):
@@ -16,17 +16,17 @@ def miner_cmd(gpu, miner, algo, location, port, username, minerid, password, int
     if miner=="ccminer-tpruvot" or miner=="ccminer-klaust" or miner=="ccminer-alexis78":
 	if intensity<0: intensity=""
 	else: intensity="-i "+str(intensity)
-	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" "+intensity #+" -d "+str(gpu)
     elif miner=="cgminer":
 	if intensity<0: intensity=""
 	else: intensity="-i "+str(intensity)
-	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" -d "+str(gpu)+" "+intensity
+	cmd="-a "+algo+" --url=stratum+tcp://"+algo+"."+location+".nicehash.com:"+port+"#xnsub --userpass="+username+"."+minerid+":"+password+" "+intensity
     elif miner=="nheqminer": #nheqminer won't connect anymore
 	cmd="-l "+algo+"."+location+".nicehash.com:"+port+" -u "+username+"."+minerid+" -p "+password
     elif miner=="EWBF":
 	if intensity<0: intensity=""
 	else: intensity="--intensity "+str(intensity)
-	cmd = "--server "+algo+"."+location+".nicehash.com --port "+port+" --user "+username+"."+minerid+" --pass "+password+" --fee 0 --templimit 75 --pec --eexit 1 "+intensity+" --cuda_devices "+str(gpu)
+	cmd = "--server "+algo+"."+location+".nicehash.com --port "+port+" --user "+username+"."+minerid+" --pass "+password+" --fee 0 --templimit 75 --pec --eexit 1 "+intensity #+" --cuda_devices "+str(gpu)
     return cmd
 
 algos = []
@@ -97,15 +97,35 @@ def updatealgos():
 
 def checkGPU():
     global gpucount, algos, best_algo
-    #Find number of NVIDIA GPUs:
-    gpucountcmd = "nvidia-smi --query-gpu=count --format=csv,noheader | tail -n 1"
-    gpucount = int(runcmd(gpucountcmd))
-    if gpucount < 1:
-	print("No NVIDIA cards found")
+
+    gpus_info=runcmd("nvidia-smi -L")
+    matches = re.findall(
+	r"GPU (?P<gpunum>\d*):.*GPU-(?P<uuid>\w{8}-\w{4}-\w{4}-\w{4}-\w{12})",
+	gpus_info
+    )
+    cards = None if not matches else {gpunum: "GPU-"+uuid for gpunum, uuid in matches}
+
+    if cards is None:
+	print("No NVIDIA cards found, exiting")
 	sys.exit(1)
-    print("NVIDIA cards found: "+str(gpucount))
-    algos = [None]*gpucount
-    best_algo = [0]*gpucount
+
+    else:
+	gpucount=len(cards)
+	for card in range(gpucount):
+	    print("GPU "+str(card)+": "+cards[str(card)])
+	print("NVIDIA cards found: "+str(gpucount))
+	algos = [None]*gpucount
+	best_algo = [0]*gpucount
+
+
+
+    #Find number of NVIDIA GPUs:
+#    gpucountcmd = "nvidia-smi --query-gpu=count --format=csv,noheader | tail -n 1"
+#    gpucount = int(runcmd(gpucountcmd))
+#    if gpucount < 1:
+#	print("No NVIDIA cards found")
+#	sys.exit(1)
+
 
 def hashlookup(gpu, hashname):
     if hashrates[gpu].has_key(hashname): return hashrates[gpu][hashname]
@@ -167,7 +187,7 @@ def startminer(gpu, algo):
     location="usa"
     msel = [x for x in miner if x.name==hashrates[gpu][algos[gpu][algo].nh_name][1]][0]
     options = miner_cmd(gpu, msel.name, algos[gpu][algo].nh_name, location, str(algos[gpu][algo].nh_port), userid, socket.gethostname()+"GPU"+str(gpu), password, algos[gpu][algo].intensity)
-    cmd="screen -dmS GPU"+str(gpu)+" "+msel.path+msel.prog+" "+options
+    cmd="CUDA_VISIBLE_DEVICES="+str(gpu)+" screen -dmS GPU"+str(gpu)+" "+msel.path+msel.prog+" "+options
     print(cmd)
     runcmd(cmd)
 
