@@ -1,0 +1,94 @@
+#!/usr/bin/env python
+
+import shlex, subprocess, time, psutil, datetime, json, urllib, sys, os, math, re
+#from urllib.request import urlopen
+
+def roundup(x):
+    return int(math.ceil(x / 5.0)) * 5
+
+def runcmd(stringcmd):
+    #cmdrun = subprocess.Popen(shlex.split(stringcmd), stdout=subprocess.PIPE, stderr=devnull)
+    cmdrun = subprocess.Popen(stringcmd, stdout=subprocess.PIPE, stderr=devnull, shell=True)
+    return cmdrun.stdout.read()
+
+def isInt(mystring):
+    try:
+	int(mystring)
+	return True
+    except ValueError:
+	return False
+
+
+devnull=open(os.devnull, 'wb')
+
+
+#nvidia=subprocess.Popen(shlex.split("xinit /usr/bin/nvidia-settings -- :0"), stdout=devnull, stderr=devnull)
+gpucountcmd="nvidia-smi --query-gpu=count --format=csv,noheader,nounits"
+#s = subprocess.Popen(shlex.split(gpucountcmd),stdout=subprocess.PIPE)
+#gpucount=int(s.stdout.read())
+gpucount=2
+
+gputemp=[60]*gpucount
+gpufan=[100]*gpucount
+while gpucount > 0:
+    for i in range(gpucount):
+
+
+	xinitcmd="xinit /usr/bin/nvidia-settings -- :"+str(i)+" -xf86config xorg"+str(i)+".conf"
+	result=runcmd("ps ax |grep \""+xinitcmd+"\" |grep -v grep |grep -v SCREEN")
+	if len(re.findall(xinitcmd, result))>0:
+	    pass
+    	    #print("xinit running for GPU"+str(i))
+	else:
+    	    print("Starting xinit for GPU"+str(i))
+    	    runcmd("CUDA_VISIBLE_DEVICES="+str(i)+" screen -dmS D"+str(i)+" "+xinitcmd)
+	    time.sleep(2)
+        #sys.exit()
+
+
+
+	ts=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+	#temp="nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits -i "+str(i)
+	temp="DISPLAY=:"+str(i)+" /usr/bin/nvidia-settings -q [gpu:0]/GPUCoreTemp -t "
+	#print(temp)
+	#print(shlex.split(temp))
+	#gputempquery=subprocess.Popen(shlex.split(temp),stdout=subprocess.PIPE, stderr=devnull)
+	gputempquery=subprocess.Popen(temp,stdout=subprocess.PIPE, stderr=devnull, shell=True)
+	result=gputempquery.stdout.read()
+	if isInt(result):
+	    gputemp[i] = int(result)
+    	    if gputemp[i] >= 50: gpufan[i]=roundup(1*gputemp[i]+40)
+    	    if gputemp[i] >= 30 and gputemp[i] < 50: gpufan[i]=roundup(6*gputemp[i]-210)
+    	    if gputemp[i] < 30: gpufan[i]=0
+
+	
+	else:
+	    print("Can't read temperature")
+	    gputemp[i] = "XX"
+	    gpufan[i]=100
+	####Need error handling above####
+
+	if gpufan[i] >= 100: gpufan[i] = 100
+        if gpufan[i] < 0: gpufan[i] = 0
+
+
+	#print(gputemp[i])
+	
+	#time.sleep(1)
+	
+	#add error handling if temp can't be read
+        print(ts+" GPU "+str(i)+" Temp: "+str(gputemp[i])+", Fan: "+str(gpufan[i])+"%")
+        fanctl="DISPLAY=:"+str(i)+" /usr/bin/nvidia-settings -a [gpu:0]/GPUFanControlState=1 -a [fan:0]/GPUTargetFanSpeed="+str(gpufan[i])+""
+        #       "xinit /usr/bin/nvidia-settings -a [gpu:0]/GPUFanControlState=1 -a [fan:0]/GPUTargetFanSpeed=100 -- :0 -once"
+        #print(fanctl)
+        s = subprocess.call(fanctl,stdout=devnull, stderr=devnull, shell=True)
+
+    time.sleep(5)
+
+sys.exit(0)
+
+    
+    
+
+
+

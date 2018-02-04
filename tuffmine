@@ -67,6 +67,8 @@ def init():
     for line in minerprog:
         miner.append(Miner(line[0], line[1], line[2]))
 
+
+
 def updatealgos():
     global algos, best_algo, rate, ts
     #Check config for any setting updates
@@ -97,6 +99,31 @@ def updatealgos():
 	best_algo[gpu] = len(tempalgos)-1
 	algos[gpu]=tempalgos
 
+def checkXINIT(gpu):
+    xinitcmd="xinit /usr/bin/nvidia-settings -- :"+str(gpu)+" -xf86config xorg"+str(gpu)+".conf"
+    result=runcmd("ps ax |grep \""+xinitcmd+"\" |grep -v grep |grep -v SCREEN")
+
+    if len(re.findall(xinitcmd, result))>0:
+        pass
+        #print("xinit running for GPU"+str(gpu_idx))
+    else:
+        print("xinit not running for GPU"+str(gpu))
+        runcmd("CUDA_VISIBLE_DEVICES="+str(gpu)+" screen -dmS D"+str(gpu)+" "+xinitcmd)
+	time.sleep(2)
+        #sys.exit()
+
+def checkFAN():
+    fancmd="screen -dmS FAN ./fancontroller"
+    result=runcmd("ps ax|grep -i \""+fancmd+"\"|grep -v grep")
+    if len(re.findall(fancmd.lower(), result.lower()))>0:
+	pass
+	#print("Fan controller running")
+    else:
+	print("Starting fan controller")
+	print(fancmd)
+	runcmd(fancmd)
+	time.sleep(2)
+	#sys.exit()
 
 def checkGPU():
     global gpucount, algos, best_algo
@@ -112,25 +139,34 @@ def checkGPU():
     if gpucount==0:
 	print("No NVIDIA cards found, exiting")
 	sys.exit(1)
-    else:
-	print("NVIDIA cards found: "+str(gpucount))
-	for card in matches:
-    	    #print(gpu_list)
-            gpu_idx=int(card[0])
-            pci=card[1]
-            uuid=card[2]
-            name=card[3]
-		#pci=runcmd("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader -i "+str(card))
-            domain=int(pci.split(":")[0],16)
-            bus=int(pci.split(":")[1],16)
-            device=int(pci.split(":")[2].split(".")[0],16)
-            function=int(pci.split(":")[2].split(".")[0],16)
-            address=str(bus)+"@"+str(domain)+":"+str(device)+":"+str(function)
-            #bus@domain:device:function
-            print("GPU "+str(gpu_idx)+": "+address+" and uuid="+uuid+" ("+name+")")
-	algos = [None]*gpucount
-	best_algo = [0]*gpucount
+    
+    print("NVIDIA cards found: "+str(gpucount))
+    for card in matches:
+        #print(gpu_list)
+        gpu_idx=int(card[0])
+        pci=card[1]
+        uuid=card[2]
+        name=card[3]
+	#pci=runcmd("nvidia-smi --query-gpu=pci.bus_id --format=csv,noheader -i "+str(card))
+        domain=int(pci.split(":")[0],16)
+        bus=int(pci.split(":")[1],16)
+        device=int(pci.split(":")[2].split(".")[0],16)
+        function=int(pci.split(":")[2].split(".")[0],16)
+        address=str(bus)+"@"+str(domain)+":"+str(device)+":"+str(function)
+        #bus@domain:device:function
+        #print("GPU "+str(gpu_idx)+": "+address+" and uuid="+uuid+" ("+name+")")
+	checkXINIT(gpu_idx)
+	checkFAN()
+	
+	#print(len(match))
+	#print(len(result))
+	#print(match)
+	
+    algos = [None]*gpucount
+    best_algo = [0]*gpucount
+    #sys.exit()
 
+#xinit /usr/bin/nvidia-settings -- :0 -xf86config xorg0.conf
 
 #    gpus_info=runcmd("nvidia-smi -L")
 #    matches = re.findall(
@@ -196,6 +232,8 @@ def miningpid(i):
 def updateGPUs():
     for gpu in range(gpucount):
 	print("")
+	checkXINIT(gpu)
+	checkFAN()
 	minerpid=miningpid(gpu)
 	if isInt(minerpid):
 	    #Existing miner found.  If using the best algo, do nothing.  Else kill miner and start new
