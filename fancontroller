@@ -23,10 +23,11 @@ devnull=open(os.devnull, 'wb')
 
 
 #nvidia=subprocess.Popen(shlex.split("xinit /usr/bin/nvidia-settings -- :0"), stdout=devnull, stderr=devnull)
-gpucountcmd="nvidia-smi --query-gpu=count --format=csv,noheader,nounits"
+gpucountcmd="nvidia-smi --query-gpu=count --format=csv,noheader,nounits | tail -n1"
 #s = subprocess.Popen(shlex.split(gpucountcmd),stdout=subprocess.PIPE)
 #gpucount=int(s.stdout.read())
-gpucount=2
+gpucount=int(runcmd(gpucountcmd))
+#gpucount=2
 
 gputemp=[60]*gpucount
 gpufan=[100]*gpucount
